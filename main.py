@@ -16,13 +16,14 @@ relayChannelsCache = {}
 waitingUsers = set()
 
 # Helper functions for config
-def loadConfig():
+def loadConfig(silent=False):
     try:
         with open("config.json", "r") as f:
             content = f.read().strip()
             if not content:
                 return {"relayChannels": {}}
-            logging.info(f"Loading config...")
+            if not silent:
+                logging.info(f"Loading config...")
             return json.loads(content)
     except FileNotFoundError:
         defaultConfig = {"relayChannels": {}}
@@ -36,9 +37,10 @@ def loadConfig():
             json.dump(defaultConfig, f, indent=2)
         return defaultConfig
 
-def getRelayChannels():
-    config = loadConfig()
-    logging.info(f"Getting relay channels...")
+def getRelayChannels(silent=False):
+    config = loadConfig(silent)
+    if not silent:
+        logging.info(f"Getting relay channels...")
     return config.get("relayChannels", {})
 
 def updateRelayChannels(sourceId, destId):
@@ -55,10 +57,16 @@ def updateRelayChannels(sourceId, destId):
 
 async def refreshRelayChannelsPeriodically():
     global relayChannelsCache
+    refreshDelay = 60
+    if refreshDelay >= 60:
+        refreshSeconds = refreshDelay % 60 or None # refreshSeconds is None if there are no additional seconds beyond the full minute
+        refreshMinutes = int(refreshDelay / 60) or None
+
     await bot.wait_until_ready()
     while not bot.is_closed():
-        relayChannelsCache = getRelayChannels()
-        await asyncio.sleep(30)
+        logging.info(f"Performing recurring reload of relay channels cache ({str(refreshMinutes)+'m' if refreshMinutes else ''}{str(refreshSeconds)+'s' if refreshSeconds else ''} delay)...")
+        relayChannelsCache = getRelayChannels(silent=True)
+        await asyncio.sleep(refreshDelay)
 
 def removeRelayEntry(sourceId=None, destId=None):
     config = loadConfig()

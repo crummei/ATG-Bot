@@ -152,6 +152,9 @@ async def add(ctx):
 @bot.command(name='remove', help='Removes a source or destination channel from the channel connections.')
 @commands.has_permissions(administrator=True)
 async def remove(ctx):
+    global waitingUsers
+    user_id = ctx.author.id
+    waitingUsers.add(user_id)
     def checkChannel(m):
         return m.author == ctx.author and m.channel == ctx.channel
 
@@ -162,12 +165,18 @@ async def remove(ctx):
         sourceChannel = None
 
         if sourceMsg.content.lower() == "all":
-            success = removeRelayEntry()
-            if success:
-                await ctx.send(f"Removed all relays from source channel {sourceChannel.mention}.")
+            await ctx.send("Are you sure you want to delete ***__EVERY SINGLE__*** channel connection? This is irreversible! (Y/N)")
+            confirmation = await bot.wait_for("message", check=checkChannel, timeout=60)
+            if confirmation.content.lower() == "y":
+                success = removeRelayEntry()
+                if success:
+                    await ctx.send("Removed every channel connection.")
+                else:
+                    await ctx.send("Failed to remove every channel connection.")
+                return
             else:
-                await ctx.send("No relays found for that source channel.")
-            return
+                await ctx.send("User aborted. Command cancelled.")
+                return
         if sourceMsg.channel_mentions:
             sourceChannel = sourceMsg.channel_mentions[0]
         else:
@@ -216,6 +225,9 @@ async def remove(ctx):
     except Exception as e:
         await ctx.send("Timed out or error occurred, command cancelled.")
         logging.warning(e)
+    
+    finally:
+        waitingUsers.discard(user_id)
 
 bot.remove_command('help')
 @bot.command(name='help', help='Gives you an overview over the available commands.')
